@@ -498,6 +498,43 @@ describe('GroupToSubframe transformer - V2 native config', () => {
     });
   });
 
+  it('should emit empty aggregation columns when the frame has no rows', async () => {
+    const emptySeries = toDataFrame({
+      name: 'A',
+      fields: [
+        { name: 'message', type: FieldType.string, values: [] },
+        { name: 'values', type: FieldType.number, values: [] },
+      ],
+    });
+
+    const cfg: DataTransformerConfig<GroupToNestedTableTransformerOptionsV2> = {
+      id: DataTransformerID.groupToNestedTable,
+      options: {
+        rules: [
+          {
+            matcher: { id: FieldMatcherID.byName, options: 'message' },
+            operation: GroupByOperationID.groupBy,
+            aggregations: [],
+          },
+          {
+            matcher: { id: FieldMatcherID.byName, options: 'values' },
+            operation: GroupByOperationID.aggregate,
+            aggregations: [ReducerID.count],
+          },
+        ],
+      },
+    };
+
+    await expect(transformDataFrame([cfg], [emptySeries])).toEmitValuesWith((received) => {
+      const result = received[0];
+      expect(result[0].length).toBe(0);
+
+      const countField = result[0].fields.find((f: Field) => f.name === 'values (count)');
+      expect(countField).toBeDefined();
+      expect(countField!.values).toEqual([]);
+    });
+  });
+
   it('should group by type using a V2 byType matcher rule', async () => {
     const testSeries = toDataFrame({
       name: 'A',
